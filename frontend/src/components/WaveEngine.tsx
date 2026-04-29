@@ -120,12 +120,12 @@ class WaveReclaimEngine {
 
   // EMA state (incremental)
   private ema6 = 0;
-  private ema12 = 0;
-  private ema18 = 0;
+  private ema13 = 0;
+  private ema21 = 0;
   private ema35 = 0;
   private prevEma6 = 0;
-  private prevEma12 = 0;
-  private prevEma18 = 0;
+  private prevEma13 = 0;
+  private prevEma21 = 0;
 
   private barCount = 0;
   private prevBar: BarData | null = null;
@@ -313,19 +313,19 @@ class WaveReclaimEngine {
       this.log(`Seed skipped — engine in ${this.state}`);
       return;
     }
-    this.ema6 = 0; this.ema12 = 0; this.ema18 = 0; this.ema35 = 0;
-    this.prevEma6 = 0; this.prevEma12 = 0; this.prevEma18 = 0;
+    this.ema6 = 0; this.ema13 = 0; this.ema21 = 0; this.ema35 = 0;
+    this.prevEma6 = 0; this.prevEma13 = 0; this.prevEma21 = 0;
     this.barCount = 0;
     this.prevBar = null;
 
     for (const bar of bars) {
       const isFirst = this.barCount === 0;
       this.prevEma6 = this.ema6;
-      this.prevEma12 = this.ema12;
-      this.prevEma18 = this.ema18;
+      this.prevEma13 = this.ema13;
+      this.prevEma21 = this.ema21;
       this.ema6 = this.initOrUpdateEMA(this.ema6, bar.close, 7, isFirst);
-      this.ema12 = this.initOrUpdateEMA(this.ema12, bar.close, 12, isFirst);
-      this.ema18 = this.initOrUpdateEMA(this.ema18, bar.close, 18, isFirst);
+      this.ema13 = this.initOrUpdateEMA(this.ema13, bar.close, 13, isFirst);
+      this.ema21 = this.initOrUpdateEMA(this.ema21, bar.close, 21, isFirst);
       this.ema35 = this.initOrUpdateEMA(this.ema35, bar.close, 35, isFirst);
       this.barCount++;
       this.prevBar = bar;
@@ -335,7 +335,7 @@ class WaveReclaimEngine {
       this.sessionDate = this.getETDate(bars[bars.length - 1].timestamp);
     }
 
-    this.log(`Seeded ${bars.length} bars — EMAs warm | e6 ${this.ema6.toFixed(2)} e12 ${this.ema12.toFixed(2)} e18 ${this.ema18.toFixed(2)} e35 ${this.ema35.toFixed(2)}`);
+    this.log(`Seeded ${bars.length} bars — EMAs warm | e6 ${this.ema6.toFixed(2)} e13 ${this.ema13.toFixed(2)} e21 ${this.ema21.toFixed(2)} e35 ${this.ema35.toFixed(2)}`);
   }
 
   onBar(bar: BarData): void {
@@ -352,8 +352,8 @@ class WaveReclaimEngine {
       this.barCount = 1;
       this.prevBar = null;
       this.prevEma6 = 0;
-      this.prevEma12 = 0;
-      this.prevEma18 = 0;
+      this.prevEma13 = 0;
+      this.prevEma21 = 0;
       this.dailyPnL = 0;
       this.signals = [];
       this.log(`New session: ${dateStr} — daily P&L reset`);
@@ -361,12 +361,12 @@ class WaveReclaimEngine {
 
     // EMAs — update previous, then current
     this.prevEma6 = this.ema6;
-    this.prevEma12 = this.ema12;
-    this.prevEma18 = this.ema18;
+    this.prevEma13 = this.ema13;
+    this.prevEma21 = this.ema21;
 
     this.ema6 = this.initOrUpdateEMA(this.ema6, bar.close, 7, isFirst);
-    this.ema12 = this.initOrUpdateEMA(this.ema12, bar.close, 12, isFirst);
-    this.ema18 = this.initOrUpdateEMA(this.ema18, bar.close, 18, isFirst);
+    this.ema13 = this.initOrUpdateEMA(this.ema13, bar.close, 13, isFirst);
+    this.ema21 = this.initOrUpdateEMA(this.ema21, bar.close, 21, isFirst);
     this.ema35 = this.initOrUpdateEMA(this.ema35, bar.close, 35, isFirst);
 
     // Warmup — need EMA35 to settle
@@ -417,7 +417,7 @@ class WaveReclaimEngine {
       const e35 = this.ema35;
       // Wave check uses PREVIOUS bar's EMAs so the pullback bar we're evaluating
       // doesn't get to veto its own setup by compressing EMA 6 on its own close.
-      const pe6 = this.prevEma6, pe12 = this.prevEma12, pe18 = this.prevEma18;
+      const pe6 = this.prevEma6, pe12 = this.prevEma13, pe18 = this.prevEma21;
       const g612 = this.cfg.minEmaGap612;
       const g1218 = this.cfg.minEmaGap1218;
       const stackedUp = (pe6 - pe12) >= g612 && (pe12 - pe18) >= g1218;
@@ -552,7 +552,7 @@ class WaveReclaimEngine {
   private getIdleLabel(): string {
     if (this.barCount === 0) return 'Waiting for chart data';
     if (this.barCount < 36) return `Warming up (${this.barCount}/36 bars)`;
-    const pe6 = this.prevEma6, pe12 = this.prevEma12, pe18 = this.prevEma18;
+    const pe6 = this.prevEma6, pe12 = this.prevEma13, pe18 = this.prevEma21;
     const g612 = this.cfg.minEmaGap612;
     const g1218 = this.cfg.minEmaGap1218;
     const stackedUp = (pe6 - pe12) >= g612 && (pe12 - pe18) >= g1218;

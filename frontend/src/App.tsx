@@ -575,23 +575,28 @@ export default function App() {
         if (i === 0) ema7.push(tfCandles[i].close);
         else ema7.push(tfCandles[i].close * k + ema7[i - 1] * (1 - k));
       }
+      const ema13: number[] = [];
+      const k13 = 2 / (13 + 1);
+      for (let i = 0; i < tfCandles.length; i++) {
+        if (i === 0) ema13.push(tfCandles[i].close);
+        else ema13.push(tfCandles[i].close * k13 + ema13[i - 1] * (1 - k13));
+      }
 
       const n = tfCandles.length;
       let anchorIdx = -1;
       const maxLookback = Math.min(5, n - 1);
 
       if (isLimitOrder) {
-        // LIMIT orders: anchor = most recent candle whose low (long) or high (short)
-        // is on the correct side of EMA7 — color doesn't matter, just position vs EMA.
+        // LIMIT orders: green candle above EMA13 for longs, red candle below EMA13 for shorts.
         for (let back = 1; back <= maxLookback; back++) {
           const i = n - 1 - back;
           if (i < 0) break;
           const c = tfCandles[i];
-          const e = ema7[i];
+          const e = ema13[i];
           if (isLong) {
-            if (c.low > e) { anchorIdx = i; break; }
+            if (c.close >= c.open && c.low > e) { anchorIdx = i; break; }
           } else {
-            if (c.high < e) { anchorIdx = i; break; }
+            if (c.close <= c.open && c.high < e) { anchorIdx = i; break; }
           }
         }
       } else {

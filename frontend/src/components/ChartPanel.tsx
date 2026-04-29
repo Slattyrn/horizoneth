@@ -190,8 +190,8 @@ function processApiResponse(bars: any[], targetMinutes: number, sourceMinutes: n
 
 interface IndicatorState {
   ema7: boolean;
-  ema12: boolean;
-  ema18: boolean;
+  ema13: boolean;
+  ema21: boolean;
   ema35: boolean;
   rthVwap: boolean;
   pdhPdl: boolean;
@@ -284,8 +284,8 @@ export default function ChartPanel({
   const [showFvg, setShowFvg] = useState(fvgEnabled);
   const [indicators, setIndicators] = useState<IndicatorState>({
     ema7: true,
-    ema12: true,
-    ema18: true,
+    ema13: true,
+    ema21: true,
     ema35: false,
     rthVwap: false,
     pdhPdl: false
@@ -383,8 +383,8 @@ export default function ChartPanel({
     const result: Record<string, number[]> = {};
 
     if (indicators.ema7) result.ema7 = calculateEMA(chartCandles, 7);
-    if (indicators.ema12) result.ema12 = calculateEMA(chartCandles, 12);
-    if (indicators.ema18) result.ema18 = calculateEMA(chartCandles, 18);
+    if (indicators.ema13) result.ema13 = calculateEMA(chartCandles, 13);
+    if (indicators.ema21) result.ema21 = calculateEMA(chartCandles, 21);
     if (indicators.ema35) result.ema35 = calculateEMA(chartCandles, 35);
     if (indicators.rthVwap) result.rthVwap = calculateRthVwap(chartCandles);
 
@@ -1116,7 +1116,7 @@ export default function ChartPanel({
         {/* Indicators + Controls */}
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1 bg-white/5 rounded-lg p-1">
-            {(['ema7', 'ema12', 'ema18', 'ema35', 'rthVwap', 'pdhPdl'] as const).map((ind) => {
+            {(['ema7', 'ema13', 'ema21', 'ema35', 'rthVwap', 'pdhPdl'] as const).map((ind) => {
               const label = ind === 'pdhPdl' ? 'PDH/PDL' : ind === 'rthVwap' ? 'VWAP' : ind.toUpperCase().replace('EMA', 'E');
               return (
                 <button

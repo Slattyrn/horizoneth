@@ -56,8 +56,8 @@ interface CandlestickChartProps {
   showVolume?: boolean;
   indicators?: {
     ema7?: number[];
-    ema12?: number[];
-    ema18?: number[];
+    ema13?: number[];
+    ema21?: number[];
     ema35?: number[];
     rthVwap?: number[];
   };
@@ -374,8 +374,8 @@ function CandlestickChart({
     if (inds) {
       const indColors: Record<string, string> = {
         ema7: '#4ade80',
-        ema12: '#22c55e',
-        ema18: '#16a34a',
+        ema13: '#22c55e',
+        ema21: '#16a34a',
         ema35: '#f59e0b',
         rthVwap: '#ffffff',
       };
