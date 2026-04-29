@@ -1,0 +1,28 @@
+# secrets
+.env
+.env.local
+
+# python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# node / vite
+node_modules/
+dist/
+.vite/
+*.log
+
+# databases / binaries
+*.db
+*.sqlite
+*.sqlite3
+
+# editor / os
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+nul

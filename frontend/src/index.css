@@ -1,0 +1,285 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --radius: 0.5rem;
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Terminal Design Tokens */
+    --terminal-black: #0A0C0F;
+    --terminal-dark: #12151A;
+    --terminal-surface: #1A1E24;
+    --terminal-border: #2A2F38;
+    --accent-cyan: #00D9FF;
+    --accent-green: #00FF88;
+    --accent-red: #FF3B5C;
+  }
+
+  .dark {
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%
+  }
+
+  /* Global font settings */
+  html {
+    font-family: 'Outfit', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Price and numeric displays */
+  .font-price {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
+}
+
+@layer components {
+  /* Live price display with glow effect */
+  .price-display {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    text-shadow: 0 0 20px currentColor;
+    transition: all 0.15s ease-out;
+  }
+
+  .price-display.bullish {
+    color: #00FF88;
+    text-shadow: 0 0 30px rgba(0, 255, 136, 0.5);
+  }
+
+  .price-display.bearish {
+    color: #FF3B5C;
+    text-shadow: 0 0 30px rgba(255, 59, 92, 0.5);
+  }
+
+  /* Ticker badge styling */
+  .ticker-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.375rem 0.75rem;
+    border-radius: 0.5rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    font-size: 0.875rem;
+    background: linear-gradient(135deg, rgba(0, 217, 255, 0.1) 0%, rgba(0, 217, 255, 0.05) 100%);
+    border: 1px solid rgba(0, 217, 255, 0.3);
+    box-shadow: 0 0 15px rgba(0, 217, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+
+  /* Live status indicator */
+  .live-indicator {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+  }
+
+  .live-indicator::before {
+    content: '';
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 9999px;
+    background-color: #00FF88;
+    box-shadow: 0 0 8px rgba(0, 255, 136, 0.8);
+    animation: live-pulse 2s ease-in-out infinite;
+  }
+
+  /* Segmented control for timeframes */
+  .timeframe-segment {
+    position: relative;
+    display: flex;
+    align-items: center;
+    padding: 0.25rem;
+    border-radius: 0.75rem;
+    background: linear-gradient(180deg, rgba(26, 30, 36, 0.8) 0%, rgba(18, 21, 26, 0.9) 100%);
+    border: 1px solid rgba(42, 47, 56, 0.5);
+  }
+
+  .timeframe-btn {
+    position: relative;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    border-radius: 0.5rem;
+    transition: all 0.2s ease;
+    color: #4A5568;
+  }
+
+  .timeframe-btn:hover {
+    color: #ffffff;
+  }
+
+  .timeframe-btn.active {
+    color: #ffffff;
+    background: linear-gradient(180deg, rgba(0, 217, 255, 0.2) 0%, rgba(0, 217, 255, 0.1) 100%);
+    box-shadow: 0 0 15px rgba(0, 217, 255, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  }
+
+  /* Control panel glass effect */
+  .control-panel {
+    border-radius: 0.75rem;
+    padding: 0.5rem;
+    background: linear-gradient(180deg, rgba(26, 30, 36, 0.6) 0%, rgba(18, 21, 26, 0.8) 100%);
+    border: 1px solid rgba(42, 47, 56, 0.4);
+    backdrop-filter: blur(10px);
+  }
+
+  /* Data stream effect */
+  .data-stream {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    color: rgba(0, 217, 255, 0.6);
+  }
+}
+
+@layer utilities {
+  /* Glow effects */
+  .glow-cyan {
+    box-shadow: 0 0 20px rgba(0, 217, 255, 0.3);
+  }
+
+  .glow-green {
+    box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
+  }
+
+  .glow-red {
+    box-shadow: 0 0 20px rgba(255, 59, 92, 0.3);
+  }
+
+  .text-glow-cyan {
+    text-shadow: 0 0 15px rgba(0, 217, 255, 0.5);
+  }
+
+  .text-glow-green {
+    text-shadow: 0 0 15px rgba(0, 255, 136, 0.5);
+  }
+
+  /* Gradient borders */
+  .border-gradient-cyan {
+    border-image: linear-gradient(135deg, rgba(0, 217, 255, 0.5), rgba(0, 217, 255, 0.1)) 1;
+  }
+}
+
+/* Keyframe animations */
+@keyframes live-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 0 8px rgba(0, 255, 136, 0.8);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(0.85);
+    box-shadow: 0 0 12px rgba(0, 255, 136, 1);
+  }
+}
+
+@keyframes price-update {
+  0% {
+    transform: scale(1.02);
+    filter: brightness(1.3);
+  }
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+}
+
+@keyframes tick-flash {
+  0% {
+    background-color: rgba(0, 217, 255, 0.2);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+@keyframes data-flow {
+  0% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 0.3;
+  }
+}
+
+/* Ticker-switch badge fade — used when activeTicker changes so the header
+   ticker badge & name re-mount gracefully instead of popping. */
+@keyframes fadeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Scanline effect for terminal feel */
+.scanlines::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.03) 2px,
+    rgba(0, 0, 0, 0.03) 4px
+  );
+}
+
+img {
+  object-position: top;
+}
+
+.fixed {
+  position: fixed;
+}
+
+/* Zone Overlay Styles for ChartPanel */
+.upper-zone-overlay {
+  background: linear-gradient(
+    to top,
+    rgba(239, 68, 68, 0.15),
+    rgba(239, 68, 68, 0.05)
+  );
+  border-bottom: 2px solid rgba(239, 68, 68, 0.4);
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.2);
+}
+
+.lower-zone-overlay {
+  background: linear-gradient(
+    to bottom,
+    rgba(34, 197, 94, 0.15),
+    rgba(34, 197, 94, 0.05)
+  );
+  border-top: 2px solid rgba(34, 197, 94, 0.4);
+  box-shadow: 0 -2px 8px rgba(34, 197, 94, 0.2);
+}
