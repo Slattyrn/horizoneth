@@ -560,35 +560,75 @@ export default function App() {
       let stopPrice: number;
       let anchorInfo = '';
 
-      // Use the selected timeframe's candles. Fall back to 1m if TF hasn't populated yet.
+      // Use the CURRENTLY SELECTED timeframe's candles for the EMA7 anchor so
+      // manual right-click orders work on any TF (1m/2m/5m/10m/etc.), not just 1m.
+      // Fall back to the 1m stream if the active TF hasn't populated yet.
       const tfCandles = (candles && candles.length >= 2) ? candles : candles1min;
       if (tfCandles.length < 2) {
-        console.error(`⚠️ ${entryTypeLabel} order: not enough candles on selected TF (${selectedTimeframe}) — aborting`);
+        console.error(`⚠️ ${entryTypeLabel} order: not enough candles on selected TF (${selectedTimeframe}) for EMA7 anchor — aborting`);
         return;
+      }
+
+      const ema7: number[] = [];
+      const k = 2 / (7 + 1);
+      for (let i = 0; i < tfCandles.length; i++) {
+        if (i === 0) ema7.push(tfCandles[i].close);
+        else ema7.push(tfCandles[i].close * k + ema7[i - 1] * (1 - k));
       }
 
       const n = tfCandles.length;
       let anchorIdx = -1;
+      const maxLookback = Math.min(5, n - 1);
 
-      if (isLimitOrder || isStopOrder) {
-        // LIMIT / STOP: find the candle whose range contains the order price.
-        for (let back = 0; back < Math.min(30, n); back++) {
+      if (isLimitOrder) {
+        // LIMIT orders: anchor = most recent candle whose low (long) or high (short)
+        // is on the correct side of EMA7 — color doesn't matter, just position vs EMA.
+        for (let back = 1; back <= maxLookback; back++) {
           const i = n - 1 - back;
           if (i < 0) break;
           const c = tfCandles[i];
-          if (c.low <= entry && c.high >= entry) { anchorIdx = i; break; }
+          const e = ema7[i];
+          if (isLong) {
+            if (c.low > e) { anchorIdx = i; break; }
+          } else {
+            if (c.high < e) { anchorIdx = i; break; }
+          }
         }
       } else {
-        // MARKET: use the current candle.
-        anchorIdx = n - 1;
+        // MARKET / STOP orders: anchor = most recent opposite-color candle on correct side of EMA7.
+        for (let back = 1; back <= maxLookback; back++) {
+          const i = n - 1 - back;
+          if (i < 0) break;
+          const c = tfCandles[i];
+          const e = ema7[i];
+          if (isLong) {
+            // LONG: bearish candle (red) sitting ABOVE 7 EMA (close > EMA)
+            if (c.close < c.open && c.close > e) { anchorIdx = i; break; }
+          } else {
+            // SHORT: bullish candle (green) sitting BELOW 7 EMA (close < EMA)
+            if (c.close > c.open && c.close < e) { anchorIdx = i; break; }
+          }
+        }
       }
 
       if (anchorIdx < 0) {
-        console.error(`⚠️ ${entryTypeLabel} order on ${selectedTimeframe}: no candle found at price ${entry} — aborting`);
+        console.error(`⚠️ ${entryTypeLabel} order on ${selectedTimeframe}: no valid EMA7 anchor in last ${maxLookback} bars — aborting`);
         return;
       }
 
-      const extreme: number = isLong ? tfCandles[anchorIdx].low : tfCandles[anchorIdx].high;
+      let extreme: number;
+      if (isLimitOrder) {
+        // Limit orders: use the anchor candle's wick directly (no extension across subsequent bars).
+        extreme = isLong ? tfCandles[anchorIdx].low : tfCandles[anchorIdx].high;
+      } else {
+        // Market/stop orders: extend the wick min/max from anchor candle to present.
+        extreme = isLong ? tfCandles[anchorIdx].low : tfCandles[anchorIdx].high;
+        for (let i = anchorIdx + 1; i < n; i++) {
+          const c = tfCandles[i];
+          if (isLong) extreme = Math.min(extreme, c.low);
+          else extreme = Math.max(extreme, c.high);
+        }
+      }
       stopPrice = isLong ? extreme - tickSize : extreme + tickSize;
       anchorInfo = `${selectedTimeframe}/${n - 1 - anchorIdx}b`;
 
@@ -600,11 +640,11 @@ export default function App() {
       // the computed stop will be above entry for a long — invalid. Abort cleanly.
       if (isLimitOrder) {
         if (isLong && stopPrice >= entry) {
-          console.error(`⚠️ LIMIT order: computed stop ${stopPrice} is at or above entry ${entry} — anchor candle is above entry — place limit closer to current price.`);
+          console.error(`⚠️ LIMIT order: computed stop ${stopPrice} is at or above entry ${entry} — anchor too far above limit price. Move limit closer to EMA7 or abort.`);
           return;
         }
         if (!isLong && stopPrice <= entry) {
-          console.error(`⚠️ LIMIT order: computed stop ${stopPrice} is at or below entry ${entry} — anchor candle is below entry — place limit closer to current price.`);
+          console.error(`⚠️ LIMIT order: computed stop ${stopPrice} is at or below entry ${entry} — anchor too far below limit price. Move limit closer to EMA7 or abort.`);
           return;
         }
       }
