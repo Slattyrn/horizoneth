@@ -55,7 +55,7 @@ interface CandlestickChartProps {
   zones?: ZoneLine[];
   showVolume?: boolean;
   indicators?: {
-    ema6?: number[];
+    ema7?: number[];
     ema12?: number[];
     ema18?: number[];
     ema35?: number[];
@@ -373,7 +373,7 @@ function CandlestickChart({
     // ─── INDICATOR LINES ────────────────────────────────────────────────
     if (inds) {
       const indColors: Record<string, string> = {
-        ema6: '#4ade80',
+        ema7: '#4ade80',
         ema12: '#22c55e',
         ema18: '#16a34a',
         ema35: '#f59e0b',

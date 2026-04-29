@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { TrendingUp, TrendingDown, MousePointer2, Target, ZoomOut, X } from 'lucide-react';
+import { TrendingUp, TrendingDown, MousePointer2, Target, ZoomOut, X, Layers, RefreshCw } from 'lucide-react';
 import { useTicker } from '../contexts/TickerContext';
 import { snapToTick } from '../utils/snapToTick';
 
@@ -16,14 +16,15 @@ interface ChartContextMenuProps {
     x: number;
     y: number;
     price: number;
-    currentPrice?: number; // 🆕 Current market price for validation display
+    currentPrice?: number;
     onClose: () => void;
     onAction: (action: ContextAction, price: number) => void;
     onResetZoom: () => void;
     onCancelAll?: () => void;
+    onFVGEntry?: (price: number, side: 'long' | 'short', mode: 'fvg' | 'reclaim') => void;
 }
 
-export default function ChartContextMenu({ x, y, price, currentPrice, onClose, onAction, onResetZoom, onCancelAll }: ChartContextMenuProps) {
+export default function ChartContextMenu({ x, y, price, currentPrice, onClose, onAction, onResetZoom, onCancelAll, onFVGEntry }: ChartContextMenuProps) {
     const { activeConfig } = useTicker();
     const { tickSize, priceDecimals } = activeConfig;
 

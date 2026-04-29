@@ -323,7 +323,7 @@ class WaveReclaimEngine {
       this.prevEma6 = this.ema6;
       this.prevEma12 = this.ema12;
       this.prevEma18 = this.ema18;
-      this.ema6 = this.initOrUpdateEMA(this.ema6, bar.close, 6, isFirst);
+      this.ema6 = this.initOrUpdateEMA(this.ema6, bar.close, 7, isFirst);
       this.ema12 = this.initOrUpdateEMA(this.ema12, bar.close, 12, isFirst);
       this.ema18 = this.initOrUpdateEMA(this.ema18, bar.close, 18, isFirst);
       this.ema35 = this.initOrUpdateEMA(this.ema35, bar.close, 35, isFirst);
@@ -364,7 +364,7 @@ class WaveReclaimEngine {
     this.prevEma12 = this.ema12;
     this.prevEma18 = this.ema18;
 
-    this.ema6 = this.initOrUpdateEMA(this.ema6, bar.close, 6, isFirst);
+    this.ema6 = this.initOrUpdateEMA(this.ema6, bar.close, 7, isFirst);
     this.ema12 = this.initOrUpdateEMA(this.ema12, bar.close, 12, isFirst);
     this.ema18 = this.initOrUpdateEMA(this.ema18, bar.close, 18, isFirst);
     this.ema35 = this.initOrUpdateEMA(this.ema35, bar.close, 35, isFirst);
