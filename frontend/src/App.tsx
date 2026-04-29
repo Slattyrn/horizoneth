@@ -560,70 +560,35 @@ export default function App() {
       let stopPrice: number;
       let anchorInfo = '';
 
-      // Use the CURRENTLY SELECTED timeframe's candles for the EMA7 anchor so
-      // manual right-click orders work on any TF (1m/2m/5m/10m/etc.), not just 1m.
-      // Fall back to the 1m stream if the active TF hasn't populated yet.
+      // Use the selected timeframe's candles. Fall back to 1m if TF hasn't populated yet.
       const tfCandles = (candles && candles.length >= 2) ? candles : candles1min;
       if (tfCandles.length < 2) {
-        console.error(`⚠️ ${entryTypeLabel} order: not enough candles on selected TF (${selectedTimeframe}) for EMA7 anchor — aborting`);
+        console.error(`⚠️ ${entryTypeLabel} order: not enough candles on selected TF (${selectedTimeframe}) — aborting`);
         return;
-      }
-
-      const ema7: number[] = [];
-      const k = 2 / (7 + 1);
-      for (let i = 0; i < tfCandles.length; i++) {
-        if (i === 0) ema7.push(tfCandles[i].close);
-        else ema7.push(tfCandles[i].close * k + ema7[i - 1] * (1 - k));
       }
 
       const n = tfCandles.length;
       let anchorIdx = -1;
-      const maxLookback = Math.min(5, n - 1);
 
-      if (isLimitOrder) {
-        // LIMIT: find the most recent candle whose range contains the limit price.
+      if (isLimitOrder || isStopOrder) {
+        // LIMIT / STOP: find the candle whose range contains the order price.
         for (let back = 0; back < Math.min(30, n); back++) {
           const i = n - 1 - back;
           if (i < 0) break;
           const c = tfCandles[i];
           if (c.low <= entry && c.high >= entry) { anchorIdx = i; break; }
         }
-      } else if (isStopOrder) {
-        // STOP orders: anchor = most recent opposite-color candle on correct side of EMA7.
-        for (let back = 1; back <= maxLookback; back++) {
-          const i = n - 1 - back;
-          if (i < 0) break;
-          const c = tfCandles[i];
-          const e = ema7[i];
-          if (isLong) {
-            if (c.close < c.open && c.close > e) { anchorIdx = i; break; }
-          } else {
-            if (c.close > c.open && c.close < e) { anchorIdx = i; break; }
-          }
-        }
       } else {
-        // MARKET orders: use the current candle directly.
+        // MARKET: use the current candle.
         anchorIdx = n - 1;
       }
 
       if (anchorIdx < 0) {
-        console.error(`⚠️ ${entryTypeLabel} order on ${selectedTimeframe}: no valid anchor found — aborting`);
+        console.error(`⚠️ ${entryTypeLabel} order on ${selectedTimeframe}: no candle found at price ${entry} — aborting`);
         return;
       }
 
-      let extreme: number;
-      if (isStopOrder) {
-        // Stop orders: extend the wick min/max from anchor candle to present.
-        extreme = isLong ? tfCandles[anchorIdx].low : tfCandles[anchorIdx].high;
-        for (let i = anchorIdx + 1; i < n; i++) {
-          const c = tfCandles[i];
-          if (isLong) extreme = Math.min(extreme, c.low);
-          else extreme = Math.max(extreme, c.high);
-        }
-      } else {
-        // Limit and Market: low of anchor candle for longs, high for shorts.
-        extreme = isLong ? tfCandles[anchorIdx].low : tfCandles[anchorIdx].high;
-      }
+      const extreme: number = isLong ? tfCandles[anchorIdx].low : tfCandles[anchorIdx].high;
       stopPrice = isLong ? extreme - tickSize : extreme + tickSize;
       anchorInfo = `${selectedTimeframe}/${n - 1 - anchorIdx}b`;
 
