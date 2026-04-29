@@ -635,6 +635,20 @@ export default function App() {
       // Snap to the active ticker's tick grid (MYM 1.0 / MES 0.25).
       stopPrice = parseFloat((Math.round(stopPrice / tickSize) * tickSize).toFixed(4));
 
+      // For limit orders the stop MUST be on the correct side of the entry price.
+      // If the anchor candle is above the limit entry (common when limit is far below market),
+      // the computed stop will be above entry for a long — invalid. Abort cleanly.
+      if (isLimitOrder) {
+        if (isLong && stopPrice >= entry) {
+          console.error(`⚠️ LIMIT order: computed stop ${stopPrice} is at or above entry ${entry} — anchor too far above limit price. Move limit closer to EMA7 or abort.`);
+          return;
+        }
+        if (!isLong && stopPrice <= entry) {
+          console.error(`⚠️ LIMIT order: computed stop ${stopPrice} is at or below entry ${entry} — anchor too far below limit price. Move limit closer to EMA7 or abort.`);
+          return;
+        }
+      }
+
       const stopDistance = Math.abs(entry - stopPrice);
       const stopTicks = stopDistance / tickSize;
       const riskPerContract = stopTicks * tickValue;
