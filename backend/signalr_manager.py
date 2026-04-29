@@ -36,7 +36,7 @@ class SignalRManager:
         self._hub = None
         self._connected = False
         self._loop = None
-        self._contracts = list(ACTIVE_CONTRACTS)  # MYM + MES dual subscription
+        self._contracts = list(ACTIVE_CONTRACTS)  # MGC only in Horizon Eth
         self._reconnect_attempts = 0
         self._max_reconnect_attempts = 999  # Effectively infinite
         self._is_reconnecting = False
@@ -105,7 +105,7 @@ class SignalRManager:
             self._attempt_reconnect()
 
     def _subscribe(self):
-        """Subscribe to market data streams for all ACTIVE_CONTRACTS (MYM + MES) - SYNCHRONOUS VERSION."""
+        """Subscribe to market data streams for all ACTIVE_CONTRACTS (MGC) - SYNCHRONOUS VERSION."""
         if not self._hub:
             logger.error("Hub not initialized")
             return
