@@ -133,7 +133,7 @@ export default function LiveDataPanel({
               : selectedTicker === 'MGC' ? 'Micro Gold (CME)'
               : selectedTicker === activeTicker ? `${activeConfig.displayName} (${activeConfig.exchange})`
               : selectedTicker === 'MYM' ? 'Micro Dow Jones (CBOT)'
-              : selectedTicker === 'MES' ? 'Micro S&P 500 (CME)'
+              : selectedTicker === 'ES' ? 'E-mini S&P 500 (CME)'
               : selectedTicker
             }
           </p>

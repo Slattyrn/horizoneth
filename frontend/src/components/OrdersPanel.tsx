@@ -163,8 +163,7 @@ export default function OrdersPanel({ className = '', automationOrders }: Orders
         // Match orders for the same contract
         return orderContract === contractId ||
           orderContract.includes('MGC') && contractId.includes('MGC') ||
-          orderContract.includes('MNQ') && contractId.includes('MNQ') ||
-          orderContract.includes('MES') && contractId.includes('MES') ||
+          orderContract.includes('ES') && contractId.includes('ES') ||
           orderContract.includes('MYM') && contractId.includes('MYM') ||
           orderContract.includes('YM') && contractId.includes('YM');
       });
@@ -280,8 +279,6 @@ export default function OrdersPanel({ className = '', automationOrders }: Orders
     if (contractId.includes('MGC')) return 'MGC';
     if (contractId.includes('MYM')) return 'MYM';
     if (contractId.includes('YM')) return 'YM';
-    if (contractId.includes('MNQ')) return 'MNQ';
-    if (contractId.includes('MES')) return 'MES';
     if (contractId.includes('ES')) return 'ES';
     if (contractId.includes('NQ')) return 'NQ';
     return contractId.split('.').pop() || contractId;

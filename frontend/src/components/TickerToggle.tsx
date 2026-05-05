@@ -2,8 +2,7 @@ import { useRef, useEffect, useState } from 'react';
 import { useTicker } from '../contexts/TickerContext';
 import { TICKER_KEYS, TICKERS, TickerKey } from '../config/tickers';
 
-// Single-ticker terminal — nothing greyed out.
-const GREYED_OUT: ReadonlySet<TickerKey> = new Set([]);
+const GREYED_OUT: ReadonlySet<TickerKey> = new Set<TickerKey>();
 
 interface TickerToggleProps {
   onBeforeSwitch?: (from: TickerKey, to: TickerKey) => void;

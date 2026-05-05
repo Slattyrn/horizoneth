@@ -12,8 +12,8 @@ const TickerContext = createContext<TickerContextValue | undefined>(undefined);
 const STORAGE_KEY = 'activeTicker';
 
 export function TickerProvider({ children }: { children: ReactNode }) {
-  // Single-ticker terminal — MGC (Micro Gold) only.
-  const [activeTicker, setActiveTickerState] = useState<TickerKey>('MGC');
+  // Always start on ES regardless of any stored value.
+  const [activeTicker, setActiveTickerState] = useState<TickerKey>('ES');
 
   useEffect(() => {
     try {

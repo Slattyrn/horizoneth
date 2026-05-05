@@ -138,7 +138,7 @@ export default function PopoutChart() {
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 bg-gray-900/80 border-b border-gray-800">
         <div className="flex items-center gap-3">
-          <span className="text-sm font-bold text-white">MES</span>
+          <span className="text-sm font-bold text-white">ES</span>
           <span className={`text-lg font-bold ${currentPrice > 0 ? 'text-green-400' : 'text-white'}`}>
             ${currentPrice.toFixed(2)}
           </span>

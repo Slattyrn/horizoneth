@@ -44,12 +44,6 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     console.error(`❌ ${this.props.componentName || 'Component'} crashed:`, error, errorInfo);
     this.setState({ error, errorInfo });
 
-    if (this.props.reloadOnError) {
-      // Root-level crash — give console a second to flush, then full reload.
-      window.setTimeout(() => window.location.reload(), 2000);
-      return;
-    }
-
     const delay = this.props.autoRetrySeconds ?? 5;
     if (delay > 0) {
       this.setState({ retryIn: delay });
@@ -95,16 +89,12 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
               </pre>
             </details>
           </div>
-          {this.props.reloadOnError ? (
-            <p className="mt-4 text-xs text-red-400">Reloading page in a moment…</p>
-          ) : (
-            <button
-              onClick={this.doRetry}
-              className="mt-4 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
-            >
-              {this.state.retryIn && this.state.retryIn > 0 ? `Retry now (auto in ${this.state.retryIn}s)` : 'Retry'}
-            </button>
-          )}
+          <button
+            onClick={this.doRetry}
+            className="mt-4 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
+          >
+            {this.state.retryIn && this.state.retryIn > 0 ? `Retry now (auto in ${this.state.retryIn}s)` : 'Retry'}
+          </button>
         </div>
       );
     }

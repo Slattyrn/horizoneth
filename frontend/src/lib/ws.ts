@@ -72,7 +72,7 @@ export function getSocket(): WebSocket {
 
   // SIMPLIFIED: Direct connection to backend (bypass proxy issues)
   const wsUrl = import.meta.env.DEV
-    ? 'ws://127.0.0.1:8001/ws/live'  // Development: direct to MGC backend (port 8001)
+    ? 'ws://127.0.0.1:8000/ws/live'  // Development: direct to backend
     : `ws://${window.location.host}/ws/live`; // Production: use location
 
   console.log(`🔌 Connecting to WebSocket: ${wsUrl}`);

@@ -18,12 +18,11 @@ load_dotenv()
 
 PROJECTX_SIGNALR_URL = os.getenv("PROJECTX_SIGNALR_URL", "wss://rtc.topstepx.com/hubs/market")
 PROJECTX_TOKEN = os.getenv("PROJECTX_TOKEN")
-DEFAULT_CONTRACT = os.getenv("DEFAULT_CONTRACT", "CON.F.US.MGC.M26")
-YM_CONTRACT = os.getenv("YM_CONTRACT", "CON.F.US.YM.M26")
+DEFAULT_CONTRACT = os.getenv("DEFAULT_CONTRACT", "CON.F.US.EP.M26")
 
-# MGC-only subscription — Horizon Eth terminal.
+# ES-only subscription — Horizon Alpha terminal (E-mini S&P 500).
 ACTIVE_CONTRACTS = [
-    os.getenv("MGC_CONTRACT", "CON.F.US.MGC.M26"),
+    os.getenv("ES_CONTRACT", "CON.F.US.EP.M26"),
 ]
 
 # --------------------------------------------------------------------
@@ -36,7 +35,7 @@ class SignalRManager:
         self._hub = None
         self._connected = False
         self._loop = None
-        self._contracts = list(ACTIVE_CONTRACTS)  # MGC only in Horizon Eth
+        self._contracts = list(ACTIVE_CONTRACTS)  # ES only — Horizon Alpha terminal
         self._reconnect_attempts = 0
         self._max_reconnect_attempts = 999  # Effectively infinite
         self._is_reconnecting = False
@@ -105,7 +104,7 @@ class SignalRManager:
             self._attempt_reconnect()
 
     def _subscribe(self):
-        """Subscribe to market data streams for all ACTIVE_CONTRACTS (MGC) - SYNCHRONOUS VERSION."""
+        """Subscribe to market data streams for all ACTIVE_CONTRACTS (ES) - SYNCHRONOUS VERSION."""
         if not self._hub:
             logger.error("Hub not initialized")
             return
@@ -282,19 +281,15 @@ class SignalRManager:
             # authoritative source because we know exactly what we subscribed to.
             # The quote data dict may omit the symbol field on some event subtypes.
             symbol = quote.get("symbol") or quote.get("symbolName") or contract_hint or ""
-            if "MYM" in symbol:
-                ticker = "MYM"  # Micro Dow Jones
-            elif "MES" in symbol:
-                ticker = "MES"  # Micro E-mini S&P 500
-            elif "MNQ" in symbol:
-                ticker = "MNQ"  # Micro E-mini Nasdaq-100
+            if "EP" in symbol:
+                ticker = "ES"   # E-mini S&P 500 (ProjectX symbol: EP, display: ESM6)
             elif "MGC" in symbol:
                 ticker = "MGC"  # Micro Gold (CME)
+            elif "MYM" in symbol:
+                ticker = "MYM"  # Micro Dow Jones
             elif "YM" in symbol:
                 ticker = "YM"   # Mini Dow Jones (CBOT)
             else:
-                # No recognisable ticker — log once and skip so we never broadcast
-                # a "MGC" tick that would be silently dropped by the frontend.
                 logger.warning(f"⚠️ Unknown symbol in quote args: {args!r:.200} — skipping")
                 return
 
@@ -306,7 +301,7 @@ class SignalRManager:
             tick = {
                 "symbol": quote.get("symbol"),
                 "symbolName": quote.get("symbolName"),
-                "ticker": ticker,  # Add ticker identifier (MYM active; MGC/MNQ/MES/YM detected if subscribed)
+                "ticker": ticker,  # Add ticker identifier (ES active; MGC/MYM/YM detected if subscribed)
                 "price": price,
                 "lastPrice": price,
                 "bid": quote.get("bestBid"),
@@ -382,14 +377,12 @@ class SignalRManager:
 
             # Determine ticker from symbol — use contract_hint (args[0]) as fallback.
             symbol = trade.get("symbol") or contract_hint or ""
-            if "MYM" in symbol:
-                ticker = "MYM"  # Micro Dow Jones
-            elif "MES" in symbol:
-                ticker = "MES"  # Micro E-mini S&P 500
-            elif "MNQ" in symbol:
-                ticker = "MNQ"  # Micro E-mini Nasdaq-100
+            if "EP" in symbol:
+                ticker = "ES"   # E-mini S&P 500 (ProjectX symbol: EP, display: ESM6)
             elif "MGC" in symbol:
                 ticker = "MGC"  # Micro Gold (CME)
+            elif "MYM" in symbol:
+                ticker = "MYM"  # Micro Dow Jones
             elif "YM" in symbol:
                 ticker = "YM"   # Mini Dow Jones (CBOT)
             else:
@@ -401,7 +394,7 @@ class SignalRManager:
             tick = {
                 "symbolId": trade.get("symbolId"),
                 "symbol": trade.get("symbol"),
-                "ticker": ticker,  # Add ticker identifier (MYM active; MGC/MNQ/MES/YM detected if subscribed)
+                "ticker": ticker,  # Add ticker identifier (ES active; MGC/MYM/YM detected if subscribed)
                 "price": trade_price,
                 "tradeVolume": trade_volume,  # Individual trade size (e.g., 5, 10, 50 contracts)
                 "type": "trade",

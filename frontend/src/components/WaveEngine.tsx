@@ -571,7 +571,7 @@ class WaveReclaimEngine {
 
 interface WaveEngineProps {
   enabled: boolean;
-  ticker: 'YM' | 'MYM' | 'MGC' | 'GC' | 'MNQ' | 'MES' | 'ES';
+  ticker: 'YM' | 'MYM' | 'MGC' | 'GC' | 'ES' | 'MNQ';
   candles5min: CandleData[];
   /** Bar stream the engine consumes — whatever TF the chart is currently showing. */
   candles: CandleData[];

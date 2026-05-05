@@ -5,6 +5,7 @@ import CandlestickChart, { CandleData, ZoneLine, OverlayObject } from "./Candles
 import type { WaveSignal } from './WaveEngine';
 import { useTicker } from "../contexts/TickerContext";
 import { TICKER_KEYS, TickerKey, isTickerKey } from "../config/tickers";
+import { snapToTick } from "../utils/snapToTick";
 import TickerToggle from "./TickerToggle";
 
 // FIXED: Removed lightweight-charts import — replaced with custom D3 canvas chart
@@ -44,6 +45,14 @@ interface ChartPanelProps {
   onCancelAllOrders?: () => void;
   onFVGDetection?: (fvg: FVG | null) => void;
   waveSignals?: WaveSignal[];
+  onFVGEntry?: (price: number, side: 'long' | 'short', mode: 'fvg' | 'reclaim', candleStop?: number) => void;
+  orderLines?: {
+    limitPrice: number | null;
+    stopLoss: number | null;
+    takeProfit: number | null;
+    orderType: 'buy' | 'sell';
+    entryPrice?: number | null;
+  } | null;
   // FIXED: Accept extra props from App.tsx that were previously silently ignored
   [key: string]: any;
 }
@@ -222,22 +231,18 @@ export default function ChartPanel({
   onOrderPlacement,
   onFVGDetection,
   waveSignals = [],
+  onFVGEntry,
+  orderLines = null,
 }: ChartPanelProps) {
   // FIXED: Removed all lightweight-charts refs (chartRef, seriesRef, volumeSeriesRef, ema*Ref, priceLineRefsRef)
 
-  // Active ticker (MYM or MES) — drives contract id, display strings, and which
-  // per-ticker candle map is visible. Both tickers stream in the background so
-  // switching is near-instant.
   const { activeTicker, activeConfig } = useTicker();
 
-  // Per-ticker candle backing stores. Both tickers accumulate candles continuously
-  // regardless of which one is currently displayed. `candlesMapRef` / `baseCandlesMapRef`
-  // always point to the ACTIVE ticker's map and are kept in sync on switch.
   const candlesStoreRef = useRef<Record<TickerKey, Map<number, CandleData>>>({
-    MGC: new Map(),
+    ES: new Map(),
   });
   const baseCandlesStoreRef = useRef<Record<TickerKey, Map<number, CandleData>>>({
-    MGC: new Map(),
+    ES: new Map(),
   });
 
   const candlesMapRef = useRef<Map<number, CandleData>>(candlesStoreRef.current[activeTicker]);
@@ -271,7 +276,7 @@ export default function ChartPanel({
   const vwapCumTPRef = useRef(0);     // fallback: sum of typicalPrice
   const vwapDateRef = useRef<string>('');  // track date for daily reset
 
-  const [selectedTimeframe, setSelectedTimeframe] = useState<Timeframe>('5m');
+  const [selectedTimeframe, setSelectedTimeframe] = useState<Timeframe>('1m');
   const [candleCountdown, setCandleCountdown] = useState<string>('--:--');
   const [currentPrice, setCurrentPrice] = useState<number | null>(null);
   const [priceDirection, setPriceDirection] = useState<'up' | 'down' | 'neutral'>('neutral');
@@ -423,6 +428,23 @@ export default function ChartPanel({
   }, [indicators.pdhPdl, pdhPdlLevels]);
 
   // ─── WAVE ENGINE OVERLAYS ─────────────────────────────────────────
+  // Convert orderLines state to full-width hline overlays for chart drawing
+  const orderLineOverlays = useMemo<OverlayObject[]>(() => {
+    if (!orderLines) return [];
+    const overlays: OverlayObject[] = [];
+    const entryPrice = orderLines.limitPrice ?? orderLines.entryPrice;
+    if (entryPrice != null) {
+      overlays.push({ type: 'hline', price: entryPrice, color: '#00D9FF', style: 'solid', label: 'ENTRY', opacity: 0.9 });
+    }
+    if (orderLines.stopLoss != null) {
+      overlays.push({ type: 'hline', price: orderLines.stopLoss, color: '#ef4444', style: 'dashed', label: 'SL', opacity: 0.8 });
+    }
+    if (orderLines.takeProfit != null) {
+      overlays.push({ type: 'hline', price: orderLines.takeProfit, color: '#22c55e', style: 'dashed', label: 'TP', opacity: 0.8 });
+    }
+    return overlays;
+  }, [orderLines]);
+
   const waveOverlays = useMemo<OverlayObject[]>(() => {
     if (!waveSignals || waveSignals.length === 0) return [];
     const overlays: OverlayObject[] = [];
@@ -525,6 +547,49 @@ export default function ChartPanel({
     return overlays;
   }, [waveSignals]);
 
+  // ─── FVG ENTRY — candle-anchored stop lookup ────────────────────────
+  // Wraps the onFVGEntry prop to inject a candleStop derived from chart data
+  // before forwarding to App.tsx. ChartContextMenu stays at 3-param signature.
+  const handleFVGEntryFromMenu = useCallback((
+    price: number,
+    side: 'long' | 'short',
+    mode: 'fvg' | 'reclaim',
+  ) => {
+    if (!onFVGEntry) return;
+
+    const candles = chartCandles;
+    let candleStop: number | undefined;
+
+    if (candles.length >= 1) {
+      // Find the candle whose range contains the clicked price.
+      // For FVG: the candle at the entry price is the structure candle.
+      // For Reclaim: the candle at the swing extreme is the anchor candle.
+      // Short → stop = candle.high;  Long → stop = candle.low
+      const lookback = Math.min(candles.length, 100);
+      let targetCandle: typeof candles[0] | undefined;
+
+      // First pass: candle range contains the price
+      for (let i = candles.length - 1; i >= candles.length - lookback; i--) {
+        const c = candles[i];
+        if (price >= c.low && price <= c.high) { targetCandle = c; break; }
+      }
+      // Fallback: nearest candle by midpoint
+      if (!targetCandle) {
+        let minDist = Infinity;
+        for (let i = candles.length - 1; i >= candles.length - lookback; i--) {
+          const c = candles[i];
+          const dist = Math.abs(price - (c.high + c.low) / 2);
+          if (dist < minDist) { minDist = dist; targetCandle = c; }
+        }
+      }
+      if (targetCandle) {
+        candleStop = side === 'short' ? targetCandle.high : targetCandle.low;
+      }
+    }
+
+    onFVGEntry(price, side, mode, candleStop);
+  }, [onFVGEntry, computedIndicators, chartCandles]);
+
   // ─── ZONE LINES ─────────────────────────────────────────────────────
 
   const zoneLines = useMemo<ZoneLine[]>(() => {
@@ -615,8 +680,7 @@ export default function ChartPanel({
     const isMarket = action.endsWith('_market');
     const orderType: 'market' | 'limit' | 'stop' = isStop ? 'stop' : (isLimit ? 'limit' : 'market');
 
-    // MYM trades in 1pt tick increments — snap to nearest integer
-    const roundedPrice = Math.round(price);
+    const roundedPrice = snapToTick(price, activeConfig.tickSize);
 
     if (isMarket) {
       // Market orders: let App.tsx compute dynamic stop/target from 1m EMA6 lookback
@@ -819,10 +883,9 @@ export default function ChartPanel({
 
   // Context menu handler — price comes from CandlestickChart's yScale at click Y
   const handleChartContextMenu = useCallback((price: number, e: MouseEvent) => {
-    // MYM trades in 1pt tick increments — snap to nearest integer
-    const snapped = Math.round(price);
+    const snapped = snapToTick(price, activeConfig.tickSize);
     setContextMenu({ x: e.clientX, y: e.clientY, price: snapped });
-  }, []);
+  }, [activeConfig.tickSize]);
 
   // ─── WEBSOCKET TICK HANDLER ─────────────────────────────────────────
 
@@ -1202,7 +1265,7 @@ export default function ChartPanel({
           zones={[...zoneLines, ...pdhPdlLines]}
           showVolume={showVolume}
           indicators={computedIndicators}
-          overlays={waveOverlays}
+          overlays={[...waveOverlays, ...orderLineOverlays]}
           candleCountdown={candleCountdown}
           onContextMenu={handleChartContextMenu}
         />
@@ -1247,6 +1310,7 @@ export default function ChartPanel({
           onAction={handleContextMenuAction}
           onResetZoom={() => {}}
           onCancelAll={onCancelAllOrders}
+          onFVGEntry={onFVGEntry ? handleFVGEntryFromMenu : undefined}
         />
       )}
     </div>
