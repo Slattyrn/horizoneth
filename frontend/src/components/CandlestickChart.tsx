@@ -37,7 +37,7 @@ export interface ZoneLine {
 }
 
 export interface OverlayObject {
-  type: 'line' | 'rect' | 'label' | 'zone' | 'arrow' | 'dot';
+  type: 'line' | 'rect' | 'label' | 'zone' | 'arrow' | 'dot' | 'hline';
   time?: number;        // bar timestamp (unix seconds) — maps to candle x position
   price?: number;       // price level — maps to y position
   endTime?: number;     // for lines spanning multiple bars
@@ -47,6 +47,7 @@ export interface OverlayObject {
   opacity?: number;
   direction?: 'up' | 'down';  // for arrows
   style?: 'solid' | 'dashed'; // for lines
+  // hline: full-width horizontal line across entire chart, no time anchor needed
 }
 
 interface CandlestickChartProps {
@@ -84,7 +85,7 @@ const THEME = {
   tooltipText: '#E8E8E8',
 } as const;
 
-const PADDING = { top: 10, right: 70, bottom: 22, left: 2 };
+const PADDING = { top: 10, right: 88, bottom: 22, left: 2 };
 const VOLUME_HEIGHT_RATIO = 0.15; // Volume panel takes 15% of chart height
 const MIN_CANDLE_WIDTH = 3;
 const MAX_CANDLE_WIDTH = 30;
@@ -283,24 +284,30 @@ function CandlestickChart({
       ctx.stroke();
     }
 
-    // Grid lines (vertical) - time labels
-    const timeStep = niceTimeStep(visible.length, chartWidth);
+    // Grid lines (vertical) + time labels — snapped to clean time boundaries
+    const cleanInterval = niceTimeInterval(visible, chartWidth);
+    let lastBoundary = -1;
     ctx.fillStyle = THEME.axisText;
     ctx.font = '10px "JetBrains Mono", monospace';
     ctx.textAlign = 'center';
-    for (let i = 0; i < visible.length; i += timeStep) {
+    ctx.textBaseline = 'alphabetic';
+    for (let i = 0; i < visible.length; i++) {
+      const t = visible[i].time;
+      const boundary = Math.floor(t / cleanInterval) * cleanInterval;
+      if (boundary === lastBoundary) continue;
+      lastBoundary = boundary;
       const x = Math.round(xScale(i));
       // Vertical grid line
       ctx.strokeStyle = THEME.gridLine;
+      ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(x + 0.5, chartTop);
       ctx.lineTo(x + 0.5, chartBottom);
       ctx.stroke();
-      // Time label
-      const d = new Date(visible[i].time * 1000);
-      const label = formatTime(d);
+      // Time label — always in the fixed bottom padding strip
+      const d = new Date(t * 1000);
       ctx.fillStyle = THEME.axisText;
-      ctx.fillText(label, x, height - PADDING.bottom + 16 - (volVisible ? volumeHeight : 0));
+      ctx.fillText(formatTime(d), x, height - PADDING.bottom + 14);
     }
 
     // Zone lines
@@ -406,10 +413,35 @@ function CandlestickChart({
       }
     }
 
-    // ─── OVERLAYS (Wave Engine signals) ──────────────────────────────────
+    // ─── OVERLAYS (Wave Engine signals + order lines) ────────────────────
     const ovls = overlaysRef.current;
     if (ovls.length > 0) {
+      // Draw full-width horizontal lines first (no candle anchor needed)
       for (const o of ovls) {
+        if (o.type !== 'hline' || o.price === undefined) continue;
+        const cy = yScale(o.price);
+        const color = o.color || '#ffffff';
+        ctx.save();
+        ctx.globalAlpha = o.opacity ?? 1.0;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash(o.style === 'dashed' ? [6, 4] : []);
+        ctx.beginPath();
+        ctx.moveTo(PADDING.left, Math.round(cy) + 0.5);
+        ctx.lineTo(chartRight, Math.round(cy) + 0.5);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        if (o.label) {
+          ctx.fillStyle = color;
+          ctx.font = 'bold 10px "JetBrains Mono", monospace';
+          ctx.textAlign = 'right';
+          ctx.fillText(o.label, chartRight - 2, Math.round(cy) - 3);
+        }
+        ctx.restore();
+      }
+
+      for (const o of ovls) {
+        if (o.type === 'hline') continue; // already handled above
         if (o.time === undefined || o.price === undefined) continue;
 
         // Find candle index for this timestamp
@@ -571,10 +603,12 @@ function CandlestickChart({
     ctx.fillStyle = THEME.axisText;
     ctx.font = '10px "JetBrains Mono", monospace';
     ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
     for (let p = gridStart; p <= maxPrice; p += priceStep) {
-      const y = Math.round(yScale(p));
-      ctx.fillText(formatPrice(p), chartRight + 4, y + 4);
+      const y = Math.round(yScale(p)) + 0.5;
+      ctx.fillText(formatPrice(p), chartRight + 4, y);
     }
+    ctx.textBaseline = 'alphabetic';
 
     // Axis border
     ctx.strokeStyle = THEME.axisLine;
@@ -822,7 +856,7 @@ function CandlestickChart({
 // ─── HELPERS ──────────────────────────────────────────────────────────────
 
 function niceStep(range: number, targetTicks: number): number {
-  if (range <= 0) return 1;
+  if (range <= 0) return 0.25;
   const rough = range / targetTicks;
   const pow = Math.pow(10, Math.floor(Math.log10(rough)));
   const norm = rough / pow;
@@ -831,13 +865,23 @@ function niceStep(range: number, targetTicks: number): number {
   else if (norm <= 3) step = 2;
   else if (norm <= 7) step = 5;
   else step = 10;
-  return step * pow;
+  const raw = step * pow;
+  // Snap to nearest 0.25 multiple so grid lines align to tick boundaries (MES/MNQ)
+  return Math.max(0.25, Math.round(raw / 0.25) * 0.25);
 }
 
-function niceTimeStep(candleCount: number, chartWidth: number): number {
-  // Target ~80px between time labels
-  const maxLabels = Math.floor(chartWidth / 80);
-  return Math.max(1, Math.ceil(candleCount / maxLabels));
+function niceTimeInterval(visible: CandleData[], chartWidth: number): number {
+  if (visible.length < 2) return 3600;
+  const totalSpan = visible[visible.length - 1].time - visible[0].time;
+  if (totalSpan <= 0) return 3600;
+  const maxLabels = Math.max(2, Math.floor(chartWidth / 80));
+  const minInterval = totalSpan / maxLabels;
+  // Clean intervals in seconds — picks the smallest that keeps labels ≥80px apart
+  const intervals = [30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 14400, 86400];
+  for (const iv of intervals) {
+    if (iv >= minInterval) return iv;
+  }
+  return 86400;
 }
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {

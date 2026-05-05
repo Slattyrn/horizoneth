@@ -36,12 +36,12 @@ PROJECTX_API_BASE = os.getenv("PROJECTX_API_BASE", "https://api.topstepx.com")
 USERNAME = os.getenv("PROJECTX_USERNAME")
 API_KEY = os.getenv("PROJECTX_API_KEY")
 TOKEN = os.getenv("PROJECTX_TOKEN")
-DEFAULT_CONTRACT = os.getenv("DEFAULT_CONTRACT", "CON.F.US.MGC.M26")
+DEFAULT_CONTRACT = os.getenv("DEFAULT_CONTRACT", "CON.F.US.EP.M26")
 
 # --------------------------------------------------------------------
 # App setup
 # --------------------------------------------------------------------
-app = FastAPI(title="Horizon Eth Terminal")
+app = FastAPI(title="Horizon Alpha Terminal")
 connected_frontends: list[WebSocket] = []
 
 # In-memory cache for historical bars
@@ -374,9 +374,8 @@ async def startup_event():
     logger.info("SignalR connection established")
 
     # 🚨 VALIDATE CONTRACT CONFIGURATION
-    logger.info(f"📋 Dual-ticker mode: MYM + MES")
-    logger.info(f"📊 MYM (Micro Dow - CBOT)  | tick 1.00 | $0.50/tick | $0.50/pt")
-    logger.info(f"📊 MES (Micro E-mini S&P 500 - CME) | tick 0.25 | $1.25/tick | $5.00/pt")
+    logger.info(f"📋 Active contract: ES (E-mini S&P 500, CME)")
+    logger.info(f"📊 ES (E-mini S&P 500 - CME)  | tick 0.25 | $12.50/tick | $50.00/pt")
     logger.info(f"📅 Contract Month: M26 (June 2026)")
 
     # Verify contract is subscribed in SignalR
@@ -447,13 +446,11 @@ async def get_config():
         "defaultContract": DEFAULT_CONTRACT,
         "apiBase": PROJECTX_API_BASE,
         "tickers": {
-            "MYM": {"contract": "CON.F.US.MYM.M26", "tickSize": 1.0, "tickValue": 0.50},
-            "MES": {"contract": "CON.F.US.MES.M26", "tickSize": 0.25, "tickValue": 1.25},
+            "ES": {"contract": "CON.F.US.EP.M26", "tickSize": 0.25, "tickValue": 12.50},
         },
-        # Legacy fields kept for any consumer still reading the flat shape.
-        # MYM values chosen as safe default (integer tick grid rejects nothing from MES's 0.25 grid).
-        "tickValue": 0.50,
-        "tickSize": 1.0,
+        # Legacy fields — ES values.
+        "tickValue": 12.50,
+        "tickSize": 0.25,
     }
 
 @app.get("/api/account")
@@ -1325,17 +1322,18 @@ async def place_order(order: OrderRequest, account_id: Optional[int] = None):
 
         # Validate tick size — tick size per contract family
         #   MGC (Micro Gold):   0.10 tick
-        #   MYM / YM (Dow):     1.00 tick
-        #   MES / ES (S&P):     0.25 tick
         #   MNQ / NQ (Nasdaq):  0.25 tick
+        #   MES / ES (S&P):     0.25 tick
+        #   MYM / YM (Dow):     1.00 tick
         contract_id_upper = (order.contractId or "").upper()
         if "MGC" in contract_id_upper:
             tick_size = 0.10
-        elif "MES" in contract_id_upper or "MNQ" in contract_id_upper or "NQ" in contract_id_upper or ("ES" in contract_id_upper and "MES" not in contract_id_upper):
+        elif "MNQ" in contract_id_upper or "NQ" in contract_id_upper or "ES" in contract_id_upper:
             tick_size = 0.25
-        else:
-            # Dow family (YM / MYM) and default
+        elif "MYM" in contract_id_upper or "YM" in contract_id_upper:
             tick_size = 1.0
+        else:
+            tick_size = 0.25  # Default to ES/NQ grid
 
         logger.info(f"🎯 [TICK-CHECK v2] contractId={order.contractId!r} → tick_size={tick_size}")
 
@@ -1710,7 +1708,7 @@ class CandleData(BaseModel):
 
 class CandleBatch(BaseModel):
     """Batch of candles to save."""
-    symbol: str = Field(default="MNQ", description="Symbol (MNQ, MES, ES, NQ)")
+    symbol: str = Field(default="ES", description="Symbol (ES)")
     timeframe: str = Field(default="5m", description="Timeframe (1m, 5m, 15m, etc.)")
     candles: List[CandleData]
 
@@ -1797,7 +1795,7 @@ async def save_candles(batch: CandleBatch):
 
 @app.get("/api/candles/load")
 async def load_candles(
-    symbol: str = "MNQ",
+    symbol: str = "ES",
     timeframe: str = "5m",
     start_time: Optional[int] = None,
     end_time: Optional[int] = None,
@@ -1807,7 +1805,7 @@ async def load_candles(
     Load candles from the local SQLite database.
 
     Args:
-        symbol: Symbol to load (default: MNQ)
+        symbol: Symbol to load (default: ES)
         timeframe: Timeframe to load (default: 5m)
         start_time: Optional start timestamp (Unix seconds)
         end_time: Optional end timestamp (Unix seconds)

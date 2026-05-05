@@ -10,6 +10,8 @@ interface PlaceOrdersProps {
   onOrderLinesChange?: (lines: OrderLinesData | null) => void;
   orderLines?: OrderLinesData | null;
   externalSuggestion?: OrderSuggestion | null;
+  targetRiskMin?: number;
+  targetRiskMax?: number;
   className?: string;
 }
 
@@ -55,6 +57,8 @@ export default function PlaceOrders({
   onOrderLinesChange,
   orderLines: externalOrderLines = null,
   externalSuggestion = null,
+  targetRiskMin = 350,
+  targetRiskMax = 500,
   className = ""
 }: PlaceOrdersProps) {
   // Active ticker drives contract id + tick math. Switching the header toggle
@@ -78,9 +82,6 @@ export default function PlaceOrders({
   const tickValue = activeConfig.tickValue;
   const tickSize = activeConfig.tickSize;
   const [autoFilledFromFVG, setAutoFilledFromFVG] = useState<boolean>(false);
-
-  // Target risk for position sizing
-  const [targetRisk, setTargetRisk] = useState<number>(200); // $200 default risk
 
   // Use account context for selected account
   const { selectedAccount, selectedAccountId } = useAccount();
@@ -134,15 +135,15 @@ export default function PlaceOrders({
     return distPoints * dollarsPerPoint;
   };
 
-  // Auto-calculate contracts based on target risk
+  // Auto-calculate contracts: start from min risk, reduce until under max
   const handleAutoCalculate = () => {
     const riskPerContract = calculateRiskPerContract();
     if (riskPerContract <= 0) return;
-    
-    const calcQty = Math.round(targetRisk / riskPerContract);
-    const finalQty = Math.max(1, calcQty);
-    setContracts(finalQty);
-    
+
+    const contracts = Math.max(1, Math.floor(targetRiskMax / riskPerContract));
+
+    setContracts(contracts);
+
     // Also auto-set take profit for 1:1 RR
     const entryPrice = orderEntryType === 'market' ? (currentPrice || 0) : (limitPrice || 0);
     if (entryPrice && stopLoss) {
@@ -220,8 +221,7 @@ export default function PlaceOrders({
     }
 
     // Validate suggestion prices (must be valid tick increments)
-    const TICK_SIZE = 1.0;
-    const isValidPrice = (price: number) => { const r = price % TICK_SIZE; return r < 0.001 || r > 0.999; };
+    const isValidPrice = (price: number) => { const r = price % tickSize; return r < 0.001 || r > (tickSize - 0.001); };
 
     if (!isValidPrice(externalSuggestion.entry) ||
       !isValidPrice(externalSuggestion.stopLoss) ||
@@ -577,13 +577,8 @@ export default function PlaceOrders({
         {/* Auto-Calculate Position Size */}
         <div className="mt-3 p-3 bg-gray-800/50 border border-gray-700/50 rounded-lg">
           <div className="flex items-center justify-between mb-2">
-            <label className="text-xs font-medium text-gray-400">Target Risk ($)</label>
-            <input
-              type="number"
-              value={targetRisk}
-              onChange={(e) => setTargetRisk(parseInt(e.target.value) || 0)}
-              className="w-20 bg-gray-900 border border-gray-700 text-white rounded px-2 py-1 text-sm text-right"
-            />
+            <label className="text-xs font-medium text-gray-400">Risk Range</label>
+            <span className="text-xs font-medium text-green-400">${targetRiskMin} – ${targetRiskMax}</span>
           </div>
           <button
             onClick={handleAutoCalculate}

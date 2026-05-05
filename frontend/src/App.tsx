@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef, useCallback, useMemo } from "react"
 import ChartPanel from "./components/ChartPanel";
 import OrdersPanel from "./components/OrdersPanel";
 import FVGFinder from "./components/FVGFinder";
+import PlaceOrders from "./components/PlaceOrders";
 import MetricsBar from "./components/MetricsBar";
 import AccountSwitcher from "./components/AccountSwitcher";
 import LiveDataPanel from "./components/LiveDataPanel";
@@ -18,6 +19,7 @@ import { useTicker } from "./contexts/TickerContext";
 import { Activity, AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { subscribe } from "./lib/ws";
 import { snapToTickOrUndefined } from "./utils/snapToTick";
+import { getMostRecentFVG } from './utils/fvgUtils';
 
 // FVG interface (matching ChartPanel export)
 interface FVG {
@@ -126,31 +128,6 @@ export default function App() {
     else setS4Zone(Math.round(value * 100) / 100);
   }, []);
 
-  // 🆕 Individual zone sizes (4-6pts per zone)
-  const [zoneSizes, setZoneSizes] = useState<{
-    upper: number;
-    lower: number;
-    r1: number;
-    s1: number;
-    r2: number;
-    s2: number;
-    r3: number;
-    s3: number;
-    r4: number;
-    s4: number;
-  }>({
-    upper: 6,
-    lower: 6,
-    r1: 6,
-    s1: 6,
-    r2: 6,
-    s2: 6,
-    r3: 6,
-    s3: 6,
-    r4: 6,
-    s4: 6
-  });
-
   const [volumeMultiplier, setVolumeMultiplier] = useState<number>(1.05);
   const [volumeEnabled, setVolumeEnabled] = useState<boolean>(true);
   const [fvgEnabled, setFvgEnabled] = useState<boolean>(true);
@@ -159,10 +136,13 @@ export default function App() {
   const [latestFVG, setLatestFVG] = useState<FVG | null>(null);
   const [recentFVGs, setRecentFVGs] = useState<FVG[]>([]); // All recent FVGs for multi-order placement
   const [orderSuggestion, setOrderSuggestion] = useState<OrderSuggestion | null>(null);
+  const [manualEntry, setManualEntry] = useState<ManualEntry | null>(null);
   const [currentPrice, setCurrentPrice] = useState<number | null>(null);
   const [dailyOpen, setDailyOpen] = useState<number | null>(null);
   const [dailyHigh, setDailyHigh] = useState<number | null>(null);
   const [dailyLow, setDailyLow] = useState<number | null>(null);
+  const [sessionMedianUpper, setSessionMedianUpper] = useState<number | null>(null);
+  const [sessionMedianLower, setSessionMedianLower] = useState<number | null>(null);
   const [orderLines, setOrderLines] = useState<{
     limitPrice: number | null;
     stopLoss: number | null;
@@ -190,11 +170,11 @@ export default function App() {
   };
   const [automationConfig, setAutomationConfig] = useState<AutomationConfigType>({
     enabled: false,
-    timeframe: '5m',
+    timeframe: '1m',
     volumeMultiplier: 1.05,
     volumeCandles: 2,
-    targetRiskMin: 495,
-    targetRiskMax: 515,
+    targetRiskMin: 350,
+    targetRiskMax: 500,
     tickSize: activeConfig.tickSize,
     tickValue: activeConfig.tickValue,
     breakEvenTrigger: 10,
@@ -236,7 +216,7 @@ export default function App() {
     manual: true,
   });
 
-  const [selectedTimeframe, setSelectedTimeframe] = useState<string>('5m');
+  const [selectedTimeframe, setSelectedTimeframe] = useState<string>('1m');
   const [candles, setCandles] = useState<CandleData[]>([]);
 
   // Candle state for Wave engine — primary `candles` tracks the selected TF.
@@ -339,10 +319,9 @@ export default function App() {
         s2: lowerZoneS2,
       },
       openPrice,
-      zoneSizes,
       currentPrice,
     };
-  }, [s1Zone, lowerZone, upperZone, r1Zone, upperZoneR2, lowerZoneS2, openPrice, zoneSizes, currentPrice]);
+  }, [s1Zone, lowerZone, upperZone, r1Zone, upperZoneR2, lowerZoneS2, openPrice, currentPrice]);
 
   // Subscribe to price updates for PlaceOrders, P&L, and daily OHLC
   useEffect(() => {
@@ -423,7 +402,7 @@ export default function App() {
           takeProfit: null,
           side,
           quantity: pos.size || pos.quantity || 1,
-          contractId: pos.contractId || 'CON.F.US.MNQ.H25',
+          contractId: pos.contractId || 'CON.F.US.EP.M26',
         };
 
         const posChanged = !activePosition ||
@@ -519,21 +498,13 @@ export default function App() {
     localOrderId?: string; // 🚨 BUG #26 FIX: Local order ID from engine
   }) => {
     // ═════════════════════════════════════════════════════════════════════
-    // 🎯 DYNAMIC EMA6 LOOKBACK STOP/TARGET (Manual market orders only)
+    // 🎯 FVG-BASED STOP/TARGET (all Manual right-click orders)
     //
-    // For right-click Buy/Sell Market orders: compute stop/target from the 1m
-    // chart's most recent opposite candle that sits on the correct side of EMA6.
-    //   LONG : find most recent bearish candle with close > EMA6 (opposite candle
-    //          ABOVE EMA — shallow pullback in uptrend) within 5 bars
-    //          stop   = min wick from that candle → now, minus 1 tick
-    //          target = entry + (entry - stop)  (1:1 RR)
-    //   SHORT: find most recent bullish candle with close < EMA6 (opposite candle
-    //          BELOW EMA — shallow bounce in downtrend) within 5 bars
-    //          stop   = max wick from that candle → now, plus 1 tick
-    //          target = entry - (stop - entry)  (1:1 RR)
-    //   No anchor within 5 bars → ABORT (no fallback — prevents the old bug where
-     //   a 10-tick fallback stop blew sizing up to 40 contracts at $400 target).
-    //   Sizing : round(targetRisk / (stop_ticks × tick_value)), min 1.
+    // Priority: most recent unmitigated FVG in trade direction → SL 1 tick
+    // beyond the near FVG boundary, TP at 2:1 RR.
+    // Fallback: anchor candle (candle whose range contains the order price,
+    // or current candle for market orders) — SL 1 tick beyond its extreme.
+    // Sizing: round(targetRisk / (stopTicks × tickValue)), min 1 contract.
     // ═════════════════════════════════════════════════════════════════════
     if (
       order.engine === 'Manual' &&
@@ -542,7 +513,8 @@ export default function App() {
     ) {
       const tickSize = automationConfig.tickSize || 1.0;
       const tickValue = automationConfig.tickValue || 0.50;
-      const targetRisk = automationConfig.targetRiskMin || 500;
+      const targetRisk = automationConfig.targetRiskMin || 350;
+      const targetRiskMax = automationConfig.targetRiskMax || 500;
       const isStopOrder = order.orderType === 'stop';
       const isLimitOrder = order.orderType === 'limit';
       const entryTypeLabel = isStopOrder ? 'STOP' : isLimitOrder ? 'LIMIT' : 'MARKET';
@@ -560,123 +532,50 @@ export default function App() {
       let stopPrice: number;
       let anchorInfo = '';
 
-      // Use the CURRENTLY SELECTED timeframe's candles for the EMA7 anchor so
-      // manual right-click orders work on any TF (1m/2m/5m/10m/etc.), not just 1m.
-      // Fall back to the 1m stream if the active TF hasn't populated yet.
+      // Use the selected timeframe's candles. Fall back to 1m if TF hasn't populated yet.
       const tfCandles = (candles && candles.length >= 2) ? candles : candles1min;
       if (tfCandles.length < 2) {
-        console.error(`⚠️ ${entryTypeLabel} order: not enough candles on selected TF (${selectedTimeframe}) for EMA7 anchor — aborting`);
+        console.error(`⚠️ ${entryTypeLabel} order: not enough candles on selected TF (${selectedTimeframe}) — aborting`);
         return;
       }
 
-      const ema7: number[] = [];
-      const k = 2 / (7 + 1);
-      for (let i = 0; i < tfCandles.length; i++) {
-        if (i === 0) ema7.push(tfCandles[i].close);
-        else ema7.push(tfCandles[i].close * k + ema7[i - 1] * (1 - k));
-      }
+      // ── FVG-BASED STOP (hard requirement — no fallback) ──────────────
+      const fvgDirection = isLong ? 'bull' : 'bear';
+      const fvgAnchor = isLimitOrder ? entry : (currentPrice ?? 0);
+      const fvgMode = isLimitOrder ? 'nearest' : 'recent';
+      const fvg = getMostRecentFVG(tfCandles, fvgDirection, 100, tickSize, fvgAnchor, fvgMode);
 
-      const n = tfCandles.length;
-      let anchorIdx = -1;
-      const maxLookback = Math.min(5, n - 1);
-
-      if (isLimitOrder) {
-        // LIMIT orders: anchor = most recent candle whose low (long) or high (short)
-        // is on the correct side of EMA7 — color doesn't matter, just position vs EMA.
-        for (let back = 1; back <= maxLookback; back++) {
-          const i = n - 1 - back;
-          if (i < 0) break;
-          const c = tfCandles[i];
-          const e = ema7[i];
-          if (isLong) {
-            if (c.low > e) { anchorIdx = i; break; }
-          } else {
-            if (c.high < e) { anchorIdx = i; break; }
-          }
-        }
-      } else {
-        // MARKET / STOP orders: anchor = most recent opposite-color candle on correct side of EMA7.
-        for (let back = 1; back <= maxLookback; back++) {
-          const i = n - 1 - back;
-          if (i < 0) break;
-          const c = tfCandles[i];
-          const e = ema7[i];
-          if (isLong) {
-            // LONG: bearish candle (red) sitting ABOVE 7 EMA (close > EMA)
-            if (c.close < c.open && c.close > e) { anchorIdx = i; break; }
-          } else {
-            // SHORT: bullish candle (green) sitting BELOW 7 EMA (close < EMA)
-            if (c.close > c.open && c.close < e) { anchorIdx = i; break; }
-          }
-        }
-      }
-
-      if (anchorIdx < 0) {
-        console.error(`⚠️ ${entryTypeLabel} order on ${selectedTimeframe}: no valid EMA7 anchor in last ${maxLookback} bars — aborting`);
+      if (!fvg) {
+        alert('No FVG detected — order blocked. Check chart.');
         return;
       }
 
-      let extreme: number;
-      if (isLimitOrder) {
-        // Limit orders: use the anchor candle's wick directly (no extension across subsequent bars).
-        extreme = isLong ? tfCandles[anchorIdx].low : tfCandles[anchorIdx].high;
-      } else {
-        // Market/stop orders: extend the wick min/max from anchor candle to present.
-        extreme = isLong ? tfCandles[anchorIdx].low : tfCandles[anchorIdx].high;
-        for (let i = anchorIdx + 1; i < n; i++) {
-          const c = tfCandles[i];
-          if (isLong) extreme = Math.min(extreme, c.low);
-          else extreme = Math.max(extreme, c.high);
-        }
-      }
-      stopPrice = isLong ? extreme - tickSize : extreme + tickSize;
-      anchorInfo = `${selectedTimeframe}/${n - 1 - anchorIdx}b`;
+      stopPrice = parseFloat((Math.round(fvg.stopLevel / tickSize) * tickSize).toFixed(4));
+      anchorInfo = `FVG@bar${fvg.barIndex}[midStop:${fvg.stopLevel.toFixed(2)}]`;
 
-      // Snap to the active ticker's tick grid (MYM 1.0 / MES 0.25).
-      stopPrice = parseFloat((Math.round(stopPrice / tickSize) * tickSize).toFixed(4));
-
-      // For limit orders the stop MUST be on the correct side of the entry price.
-      // If the anchor candle is above the limit entry (common when limit is far below market),
-      // the computed stop will be above entry for a long — invalid. Abort cleanly.
-      if (isLimitOrder) {
-        if (isLong && stopPrice >= entry) {
-          console.error(`⚠️ LIMIT order: computed stop ${stopPrice} is at or above entry ${entry} — anchor too far above limit price. Move limit closer to EMA7 or abort.`);
-          return;
-        }
-        if (!isLong && stopPrice <= entry) {
-          console.error(`⚠️ LIMIT order: computed stop ${stopPrice} is at or below entry ${entry} — anchor too far below limit price. Move limit closer to EMA7 or abort.`);
-          return;
-        }
+      if ((isLong && stopPrice >= entry) || (!isLong && stopPrice <= entry)) {
+        alert('FVG stop invalid for entry direction — order blocked.');
+        return;
       }
 
       const stopDistance = Math.abs(entry - stopPrice);
       const stopTicks = stopDistance / tickSize;
       const riskPerContract = stopTicks * tickValue;
-      const qty = Math.max(1, Math.round(targetRisk / riskPerContract));
+      const qty = Math.max(1, Math.floor(targetRiskMax / riskPerContract));
       const totalRisk = qty * riskPerContract;
 
-      if (isLimitOrder) {
-        console.log(
-          `🎯 ${order.side.toUpperCase()} LIMIT @ ${entry} | Stop ${stopPrice} (${stopTicks}t) | ${qty}x | Risk $${totalRisk.toFixed(2)} | Anchor ${anchorInfo} | TP: manual`
-        );
-        order = {
-          ...order,
-          quantity: qty,
-          stopLoss: stopPrice,
-        };
-      } else {
-        const rawTarget = isLong ? entry + stopDistance : entry - stopDistance;
-        const target = parseFloat((Math.round(rawTarget / tickSize) * tickSize).toFixed(4));
-        console.log(
-          `🎯 ${order.side.toUpperCase()} ${entryTypeLabel} @ ${entry} | Stop ${stopPrice} (${stopTicks}t) | TP ${target.toFixed(2)} | ${qty}x | Risk $${totalRisk.toFixed(2)} | Anchor ${anchorInfo}`
-        );
-        order = {
-          ...order,
-          quantity: qty,
-          stopLoss: stopPrice,
-          takeProfit: target,
-        };
-      }
+      // TP at 2:1 RR for all order types
+      const rawTarget = isLong ? entry + stopDistance * 2 : entry - stopDistance * 2;
+      const target = parseFloat((Math.round(rawTarget / tickSize) * tickSize).toFixed(4));
+      console.log(
+        `🎯 ${order.side.toUpperCase()} ${entryTypeLabel} @ ${entry} | Stop ${stopPrice} (${stopTicks}t) | TP ${target.toFixed(2)} 2:1 | ${qty}x | Risk $${totalRisk.toFixed(2)} | Anchor ${anchorInfo}`
+      );
+      order = {
+        ...order,
+        quantity: qty,
+        stopLoss: stopPrice,
+        takeProfit: target,
+      };
     }
 
     // 🚨 CIRCUIT BREAKER: Check daily loss limit BEFORE placing order
@@ -693,16 +592,7 @@ export default function App() {
       return;
     }
 
-    // 🚨 CIRCUIT BREAKER: Check daily trade limit BEFORE placing order
-    // 🟢 BYPASS FOR MANUAL ORDERS: Allow manual trading even if automation limits hit
-    if (order.engine !== 'Manual' && dailyTradeCount >= automationConfig.maxDailyTrades) {
-      const message = `🚨 CIRCUIT BREAKER: Max daily trades reached (${dailyTradeCount} / ${automationConfig.maxDailyTrades}). Automation disabled.`;
-      console.error(message);
-      alert(message);
-      setAutomationConfig(prev => ({ ...prev, enabled: false }));
-      setAutomationEnabled(false);
-      return;
-    }
+    // Daily trade limit removed — unlimited trades allowed
 
     // Determine order type (default to limit for backward compatibility)
     const actualOrderType = order.orderType || 'limit';
@@ -757,7 +647,8 @@ export default function App() {
       if ((order.engine === 'Manual' || order.engine === 'Wave') && (!order.quantity || order.quantity === 0)) {
 
         // 1. GET RISK FROM SIDEBAR CONFIG
-        const targetRiskDollars = automationConfig.targetRiskMin || 300;
+        const targetRiskDollars = automationConfig.targetRiskMin || 350;
+        const targetRiskDollarsMax = automationConfig.targetRiskMax || 500;
 
         // 2. Determine Entry Price (Limit/Stop price, or Current Price for Market)
         const entryPrice = order.limitPrice || order.stopPrice || currentPrice || 0;
@@ -775,11 +666,7 @@ export default function App() {
           const dollarsPerPoint = tickValue / tickSize;
           const riskPerContract = distPoints * dollarsPerPoint;
 
-          // Calculate contracts: round to get closest to target risk
-          let calcQty = Math.round(targetRiskDollars / riskPerContract);
-
-          // Min 1 contract
-          finalQuantity = Math.max(1, calcQty);
+          finalQuantity = Math.max(1, Math.floor(targetRiskDollarsMax / riskPerContract));
 
           // Calculate actual risk
           const actualRisk = finalQuantity * riskPerContract;
@@ -879,11 +766,6 @@ export default function App() {
           isFilled: actualOrderType === 'market' // Only Market orders are "filled" immediately. Stop orders are working.
         });
 
-        // CRITICAL: Market orders need a price reference for bracket orders
-        // Use current price if not already set
-        if (actualOrderType === 'market' && !payload.price) {
-          payload.price = estimatedEntry;
-        }
       }
 
       // 🛡️ VALIDATION: Ensure critical fields are not null/zero
@@ -953,9 +835,9 @@ export default function App() {
         // 🎯 UNIFIED BRACKET RULES:
         //   • MARKET entry → SL + TP
         //   • STOP   entry → SL + TP
-        //   • LIMIT  entry → SL only (user manages TP manually)
+        //   • LIMIT  entry → SL + TP (2:1 RR, placed immediately with entry)
         // Wave now flows through the same bracket pipeline as Manual.
-        const shouldPlaceTP = (isManual || isWave) && (isMarketEntry || isStopEntry) && !!order.takeProfit;
+        const shouldPlaceTP = (isManual || isWave) && (isMarketEntry || isStopEntry || isLimitEntry) && !!order.takeProfit;
         const shouldPlaceSL = (isManual || isWave) && (isMarketEntry || isStopEntry || isLimitEntry) && !!order.stopLoss;
 
         if (shouldPlaceTP || shouldPlaceSL) {
@@ -1003,7 +885,7 @@ export default function App() {
             if (tpResp && tpResp.ok) {
               const tpData = await tpResp.json();
               manualTpOrderId = tpData.orderId?.toString() || null;
-              console.log(`🎯 ${isStopEntry ? 'STOP' : 'MARKET'}-entry TP placed @ ${order.takeProfit}: ID ${manualTpOrderId}`);
+              console.log(`🎯 ${isStopEntry ? 'STOP' : isLimitEntry ? 'LIMIT' : 'MARKET'}-entry TP placed @ ${order.takeProfit}: ID ${manualTpOrderId}`);
             } else if (tpResp) {
               const errText = await tpResp.text();
               console.error(`❌ Manual TP bracket FAILED @ ${order.takeProfit}: ${errText}`);
@@ -1019,7 +901,7 @@ export default function App() {
             if (slResp && slResp.ok) {
               const slData = await slResp.json();
               manualStopOrderId = slData.orderId?.toString() || null;
-              console.log(`🛡️ ${isStopEntry ? 'STOP' : 'MARKET'}-entry SL placed @ ${order.stopLoss}: ID ${manualStopOrderId}`);
+              console.log(`🛡️ ${isStopEntry ? 'STOP' : isLimitEntry ? 'LIMIT' : 'MARKET'}-entry SL placed @ ${order.stopLoss}: ID ${manualStopOrderId}`);
             } else if (slResp) {
               console.error(`❌ Manual SL bracket failed: ${await slResp.text()}`);
             }
@@ -1097,13 +979,7 @@ export default function App() {
       setAutomationEnabled(false);
     }
 
-    if (newTradeCount >= automationConfig.maxDailyTrades) {
-      const message = `🚨 CIRCUIT BREAKER TRIGGERED: Max daily trades reached (${newTradeCount}). Automation disabled.`;
-      console.error(message);
-      alert(message);
-      setAutomationConfig(prev => ({ ...prev, enabled: false }));
-      setAutomationEnabled(false);
-    }
+    // Daily trade limit removed — unlimited trades allowed
   };
 
   // Automation stop loss update handler
@@ -1406,6 +1282,18 @@ export default function App() {
               onConfigChange={setAutomationConfig}
               className="flex-shrink-0"
             />
+
+
+            {/* Manual Order Entry */}
+            <ErrorBoundary componentName="Place Orders">
+              <PlaceOrders
+                currentPrice={currentPrice}
+                externalSuggestion={orderSuggestion as any}
+                targetRiskMin={automationConfig.targetRiskMin}
+                targetRiskMax={automationConfig.targetRiskMax}
+                className="flex-shrink-0"
+              />
+            </ErrorBoundary>
           </aside>
 
           {/* Center - Chart (Expanded to fill more space) */}
@@ -1427,11 +1315,10 @@ export default function App() {
                 r4Zone={r4Zone}
                 s4Zone={s4Zone}
                 openPrice={openPrice}
-                zoneSizes={zoneSizes}
                 volumeMultiplier={volumeMultiplier}
                 volumeEnabled={volumeEnabled}
                 fvgEnabled={fvgEnabled}
-                orderLines={orderLines}
+                orderLines={null}
                 onOrderLinesDrag={setOrderLines}
                 onFvgCountsUpdate={handleFvgCountsUpdate}
                 onLatestFVG={setLatestFVG}
@@ -1443,6 +1330,7 @@ export default function App() {
                 onEdgesChange={setEnabledEdges}
                 onFVGDetection={setLatestFVG}
                 waveSignals={waveSignals}
+                onFVGEntry={(price, side, mode, candleStop) => setManualEntry({ price, side, mode, candleStop })}
               />
             </div>
 
