@@ -4,7 +4,7 @@ import { useEffect } from 'react';
  * Custom hook to dynamically update browser tab title with ticker and price
  * Example: "ES 5950.25" or "MES 5950.25"
  */
-export function useDynamicTitle(ticker: 'MYM' | 'YM' | 'MGC' | 'GC' | 'ES' | 'MNQ' | null, price: number | null, openPrice: number | null) {
+export function useDynamicTitle(ticker: 'ES' | null, price: number | null, openPrice: number | null) {
     useEffect(() => {
         if (!ticker) {
             document.title = 'Horizon Alpha Terminal';

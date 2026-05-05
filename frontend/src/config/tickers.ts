@@ -1,4 +1,4 @@
-export type TickerKey = 'ES' | 'MNQ';
+export type TickerKey = 'ES';
 
 export interface TickerConfig {
   key: TickerKey;
@@ -22,24 +22,14 @@ export const TICKERS: Record<TickerKey, TickerConfig> = {
     priceDecimals: 2,
     dollarsPerPoint: 50.0,
   },
-  MNQ: {
-    key: 'MNQ',
-    contract: 'CON.F.US.MNQ.M26',
-    displayName: 'Micro E-mini Nasdaq 100',
-    exchange: 'CME',
-    tickSize: 0.25,
-    tickValue: 0.50,
-    priceDecimals: 2,
-    dollarsPerPoint: 2.0,
-  },
 };
 
-export const TICKER_KEYS: TickerKey[] = ['ES', 'MNQ'];
+export const TICKER_KEYS: TickerKey[] = ['ES'];
 
 export function getTickerConfig(key: TickerKey): TickerConfig {
   return TICKERS[key];
 }
 
 export function isTickerKey(value: unknown): value is TickerKey {
-  return value === 'ES' || value === 'MNQ';
+  return value === 'ES';
 }
