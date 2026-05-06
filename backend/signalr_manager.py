@@ -18,7 +18,7 @@ load_dotenv()
 
 PROJECTX_SIGNALR_URL = os.getenv("PROJECTX_SIGNALR_URL", "wss://rtc.topstepx.com/hubs/market")
 PROJECTX_TOKEN = os.getenv("PROJECTX_TOKEN")
-DEFAULT_CONTRACT = os.getenv("DEFAULT_CONTRACT", "CON.F.US.EP.M26")
+DEFAULT_CONTRACT = os.getenv("DEFAULT_CONTRACT", "CON.F.US.GC.M26")
 
 ACTIVE_CONTRACTS = [
     DEFAULT_CONTRACT,
@@ -281,13 +281,17 @@ class SignalRManager:
             # The quote data dict may omit the symbol field on some event subtypes.
             symbol = quote.get("symbol") or quote.get("symbolName") or contract_hint or ""
             if "EP" in symbol:
-                ticker = "ES"   # E-mini S&P 500 (ProjectX symbol: EP, display: ESM6)
+                ticker = "ES"   # E-mini S&P 500
             elif "MGC" in symbol:
-                ticker = "MGC"  # Micro Gold (CME)
+                ticker = "MGC"  # Micro Gold — check before GC (substring)
+            elif "GC" in symbol:
+                ticker = "GC"   # Gold (COMEX)
+            elif "MNQ" in symbol:
+                ticker = "MNQ"  # Micro Nasdaq-100
             elif "MYM" in symbol:
                 ticker = "MYM"  # Micro Dow Jones
             elif "YM" in symbol:
-                ticker = "YM"   # Mini Dow Jones (CBOT)
+                ticker = "YM"   # Mini Dow Jones
             else:
                 logger.warning(f"⚠️ Unknown symbol in quote args: {args!r:.200} — skipping")
                 return
@@ -377,13 +381,17 @@ class SignalRManager:
             # Determine ticker from symbol — use contract_hint (args[0]) as fallback.
             symbol = trade.get("symbol") or contract_hint or ""
             if "EP" in symbol:
-                ticker = "ES"   # E-mini S&P 500 (ProjectX symbol: EP, display: ESM6)
+                ticker = "ES"   # E-mini S&P 500
             elif "MGC" in symbol:
-                ticker = "MGC"  # Micro Gold (CME)
+                ticker = "MGC"  # Micro Gold — check before GC (substring)
+            elif "GC" in symbol:
+                ticker = "GC"   # Gold (COMEX)
+            elif "MNQ" in symbol:
+                ticker = "MNQ"  # Micro Nasdaq-100
             elif "MYM" in symbol:
                 ticker = "MYM"  # Micro Dow Jones
             elif "YM" in symbol:
-                ticker = "YM"   # Mini Dow Jones (CBOT)
+                ticker = "YM"   # Mini Dow Jones
             else:
                 logger.warning(f"⚠️ Unknown symbol in trade args: {args!r:.200} — skipping")
                 return

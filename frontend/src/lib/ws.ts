@@ -70,10 +70,7 @@ export function getSocket(): WebSocket {
     return ws;
   }
 
-  // SIMPLIFIED: Direct connection to backend (bypass proxy issues)
-  const wsUrl = import.meta.env.DEV
-    ? 'ws://127.0.0.1:8000/ws/live'  // Development: direct to backend
-    : `ws://${window.location.host}/ws/live`; // Production: use location
+  const wsUrl = `ws://${window.location.host}/ws/live`;
 
   console.log(`🔌 Connecting to WebSocket: ${wsUrl}`);
 

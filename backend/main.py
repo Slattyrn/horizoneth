@@ -1321,12 +1321,12 @@ async def place_order(order: OrderRequest, account_id: Optional[int] = None):
             raise HTTPException(status_code=400, detail="Stop orders require a stop price")
 
         # Validate tick size — tick size per contract family
-        #   MGC (Micro Gold):   0.10 tick
+        #   GC / MGC (Gold):    0.10 tick
         #   MNQ / NQ (Nasdaq):  0.25 tick
         #   MES / ES (S&P):     0.25 tick
         #   MYM / YM (Dow):     1.00 tick
         contract_id_upper = (order.contractId or "").upper()
-        if "MGC" in contract_id_upper:
+        if "MGC" in contract_id_upper or "GC" in contract_id_upper:
             tick_size = 0.10
         elif "MNQ" in contract_id_upper or "NQ" in contract_id_upper or "ES" in contract_id_upper:
             tick_size = 0.25

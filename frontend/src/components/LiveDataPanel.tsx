@@ -26,7 +26,7 @@ export default function LiveDataPanel({
 }: {
   className?: string;
   /** Optional override. When omitted the panel follows the global TickerContext. */
-  selectedTicker?: TickerKey | 'YM' | 'ES' | 'MGC' | 'GC';
+  selectedTicker?: TickerKey | 'YM' | 'ES' | 'GC';
 }) {
   const { activeTicker, activeConfig } = useTicker();
   const selectedTicker = selectedTickerProp ?? activeTicker;
@@ -130,7 +130,6 @@ export default function LiveDataPanel({
           <p className="text-sm text-gray-500 mt-1">
             {selectedTicker} - {
               selectedTicker === 'GC' ? 'Gold (COMEX)'
-              : selectedTicker === 'MGC' ? 'Micro Gold (CME)'
               : selectedTicker === activeTicker ? `${activeConfig.displayName} (${activeConfig.exchange})`
               : selectedTicker === 'MYM' ? 'Micro Dow Jones (CBOT)'
               : selectedTicker === 'ES' ? 'E-mini S&P 500 (CME)'

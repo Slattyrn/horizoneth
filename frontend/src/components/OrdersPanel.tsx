@@ -162,7 +162,7 @@ export default function OrdersPanel({ className = '', automationOrders }: Orders
         const orderContract = o.contractId || '';
         // Match orders for the same contract
         return orderContract === contractId ||
-          orderContract.includes('MGC') && contractId.includes('MGC') ||
+          orderContract.includes('GC') && contractId.includes('GC') ||
           orderContract.includes('ES') && contractId.includes('ES') ||
           orderContract.includes('MYM') && contractId.includes('MYM') ||
           orderContract.includes('YM') && contractId.includes('YM');
@@ -276,7 +276,7 @@ export default function OrdersPanel({ className = '', automationOrders }: Orders
   };
 
   const getShortSymbol = (contractId: string) => {
-    if (contractId.includes('MGC')) return 'MGC';
+    if (contractId.includes('GC')) return 'GC';
     if (contractId.includes('MYM')) return 'MYM';
     if (contractId.includes('YM')) return 'YM';
     if (contractId.includes('ES')) return 'ES';

@@ -239,10 +239,10 @@ export default function ChartPanel({
   const { activeTicker, activeConfig } = useTicker();
 
   const candlesStoreRef = useRef<Record<TickerKey, Map<number, CandleData>>>({
-    ES: new Map(),
+    GC: new Map(),
   });
   const baseCandlesStoreRef = useRef<Record<TickerKey, Map<number, CandleData>>>({
-    ES: new Map(),
+    GC: new Map(),
   });
 
   const candlesMapRef = useRef<Map<number, CandleData>>(candlesStoreRef.current[activeTicker]);

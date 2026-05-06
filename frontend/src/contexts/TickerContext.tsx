@@ -12,7 +12,7 @@ const TickerContext = createContext<TickerContextValue | undefined>(undefined);
 const STORAGE_KEY = 'activeTicker';
 
 export function TickerProvider({ children }: { children: ReactNode }) {
-  const [activeTicker, setActiveTickerState] = useState<TickerKey>('MGC');
+  const [activeTicker, setActiveTickerState] = useState<TickerKey>('GC');
 
   useEffect(() => {
     try {
