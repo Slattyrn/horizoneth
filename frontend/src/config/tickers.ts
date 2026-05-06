@@ -1,4 +1,4 @@
-export type TickerKey = 'ES';
+export type TickerKey = 'MGC';
 
 export interface TickerConfig {
   key: TickerKey;
@@ -12,24 +12,24 @@ export interface TickerConfig {
 }
 
 export const TICKERS: Record<TickerKey, TickerConfig> = {
-  ES: {
-    key: 'ES',
-    contract: 'CON.F.US.EP.M26',
-    displayName: 'E-mini S&P 500',
+  MGC: {
+    key: 'MGC',
+    contract: 'CON.F.US.MGC.M26',
+    displayName: 'Micro Gold',
     exchange: 'CME',
-    tickSize: 0.25,
-    tickValue: 12.50,
-    priceDecimals: 2,
-    dollarsPerPoint: 50.0,
+    tickSize: 0.10,
+    tickValue: 1.00,
+    priceDecimals: 1,
+    dollarsPerPoint: 10.0,
   },
 };
 
-export const TICKER_KEYS: TickerKey[] = ['ES'];
+export const TICKER_KEYS: TickerKey[] = ['MGC'];
 
 export function getTickerConfig(key: TickerKey): TickerConfig {
   return TICKERS[key];
 }
 
 export function isTickerKey(value: unknown): value is TickerKey {
-  return value === 'ES';
+  return value === 'MGC';
 }

@@ -12,8 +12,7 @@ const TickerContext = createContext<TickerContextValue | undefined>(undefined);
 const STORAGE_KEY = 'activeTicker';
 
 export function TickerProvider({ children }: { children: ReactNode }) {
-  // Always start on ES regardless of any stored value.
-  const [activeTicker, setActiveTickerState] = useState<TickerKey>('ES');
+  const [activeTicker, setActiveTickerState] = useState<TickerKey>('MGC');
 
   useEffect(() => {
     try {
