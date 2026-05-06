@@ -25,3 +25,7 @@ dist/
 .DS_Store
 Thumbs.db
 nul
+
+# windows-only scripts (not needed in repo — mac uses start.sh)
+start.bat
+setup.bat
