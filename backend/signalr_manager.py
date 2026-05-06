@@ -20,9 +20,8 @@ PROJECTX_SIGNALR_URL = os.getenv("PROJECTX_SIGNALR_URL", "wss://rtc.topstepx.com
 PROJECTX_TOKEN = os.getenv("PROJECTX_TOKEN")
 DEFAULT_CONTRACT = os.getenv("DEFAULT_CONTRACT", "CON.F.US.EP.M26")
 
-# ES-only subscription — Horizon Alpha terminal (E-mini S&P 500).
 ACTIVE_CONTRACTS = [
-    os.getenv("ES_CONTRACT", "CON.F.US.EP.M26"),
+    DEFAULT_CONTRACT,
 ]
 
 # --------------------------------------------------------------------
@@ -35,7 +34,7 @@ class SignalRManager:
         self._hub = None
         self._connected = False
         self._loop = None
-        self._contracts = list(ACTIVE_CONTRACTS)  # ES only — Horizon Alpha terminal
+        self._contracts = list(ACTIVE_CONTRACTS)
         self._reconnect_attempts = 0
         self._max_reconnect_attempts = 999  # Effectively infinite
         self._is_reconnecting = False
